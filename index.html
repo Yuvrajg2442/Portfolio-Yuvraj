@@ -948,9 +948,9 @@
 
 .nav-pill-bg {
     position: absolute;
-    top: 50%;
+    /* top: 50%; */
     transform: translateY(-50%);
-    height: 40px;
+    height: 100%;
     background: var(--primary-gradient);
     border-radius: 25px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1565,7 +1565,7 @@
                 </svg>
             </a>
         </div>
-        <p>&copy; 2025 Yuvraj Gupta. All rights reserved. Made with ❤️</p>
+        <p>&copy; Made with ❤️ by Yuvraj Gupta. All rights reserved. </p>
     </div>
 </footer>
 
@@ -1971,14 +1971,19 @@ class ParticleSystem {
 }
 
 // Floating Navigation Pills
+// Floating Navigation Pills with Scroll Detection
 class FloatingPills {
     constructor() {
         this.navLinks = document.querySelectorAll('.nav-link');
         this.pillBg = document.querySelector('.nav-pill-bg');
         this.activeLink = document.querySelector('.nav-link.active');
+        this.sections = [];
+        this.isScrolling = false;
+        this.scrollTimeout = null;
         
         this.initPill();
         this.bindEvents();
+        this.initScrollSpy();
     }
     
     initPill() {
@@ -1993,33 +1998,141 @@ class FloatingPills {
         
         this.pillBg.style.width = `${rect.width}px`;
         this.pillBg.style.left = `${rect.left - navRect.left}px`;
+        this.pillBg.style.transform = 'translateZ(0)'; // Hardware acceleration
+    }
+    
+    initScrollSpy() {
+        // Get all sections that correspond to nav links
+        this.navLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && href.startsWith('#')) {
+                const section = document.querySelector(href);
+                if (section) {
+                    this.sections.push({
+                        id: href.substring(1),
+                        element: section,
+                        link: link
+                    });
+                }
+            }
+        });
+        
+        // Sort sections by their position on the page
+        this.sections.sort((a, b) => {
+            return a.element.offsetTop - b.element.offsetTop;
+        });
+        
+        // Initial check
+        this.checkActiveSection();
+    }
+    
+    checkActiveSection() {
+        const scrollPosition = window.scrollY + 100; // Offset for better UX
+        let currentSection = null;
+        
+        // Find the current section based on scroll position
+        for (let i = this.sections.length - 1; i >= 0; i--) {
+            const section = this.sections[i];
+            if (scrollPosition >= section.element.offsetTop) {
+                currentSection = section;
+                break;
+            }
+        }
+        
+        // Update active link if section changed
+        if (currentSection && currentSection.link !== this.activeLink) {
+            this.setActiveLink(currentSection.link, false);
+        }
+    }
+    
+    setActiveLink(newActiveLink, shouldScroll = true) {
+        // Remove active class from all links
+        this.navLinks.forEach(l => l.classList.remove('active'));
+        
+        // Add active class to new active link
+        newActiveLink.classList.add('active');
+        this.activeLink = newActiveLink;
+        
+        // Update pill position
+        this.updatePillPosition(newActiveLink);
+        
+        // Scroll to section if needed
+        if (shouldScroll) {
+            const href = newActiveLink.getAttribute('href');
+            if (href && href.startsWith('#')) {
+                const target = document.querySelector(href);
+                if (target) {
+                    // Smooth scroll to target
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            }
+        }
     }
     
     bindEvents() {
+        // Mouse hover effects
         this.navLinks.forEach(link => {
             link.addEventListener('mouseenter', () => {
-                this.updatePillPosition(link);
+                if (!this.isScrolling) {
+                    this.updatePillPosition(link);
+                }
             });
             
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                
-                // Remove active class from all links
-                this.navLinks.forEach(l => l.classList.remove('active'));
-                
-                // Add active class to clicked link
-                link.classList.add('active');
-                this.activeLink = link;
-                
-                // Update pill position
-                this.updatePillPosition(link);
+                this.setActiveLink(link, true);
             });
         });
         
         // Reset pill to active link when mouse leaves nav
-        document.querySelector('.nav-pills').addEventListener('mouseleave', () => {
-            if (this.activeLink) {
-                this.updatePillPosition(this.activeLink);
+        const navPills = document.querySelector('.nav-pills');
+        if (navPills) {
+            navPills.addEventListener('mouseleave', () => {
+                if (this.activeLink && !this.isScrolling) {
+                    this.updatePillPosition(this.activeLink);
+                }
+            });
+        }
+        
+        // Scroll event listener with throttling
+        let scrollTimer = null;
+        window.addEventListener('scroll', () => {
+            this.isScrolling = true;
+            
+            // Clear existing timer
+            if (scrollTimer) {
+                clearTimeout(scrollTimer);
+            }
+            
+            // Throttle scroll events
+            scrollTimer = setTimeout(() => {
+                this.checkActiveSection();
+                this.isScrolling = false;
+            }, 50);
+        });
+        
+        // Handle browser back/forward navigation
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash;
+            if (hash) {
+                const targetLink = document.querySelector(`.nav-link[href="${hash}"]`);
+                if (targetLink) {
+                    this.setActiveLink(targetLink, false);
+                }
+            }
+        });
+        
+        // Handle direct hash navigation on page load
+        window.addEventListener('load', () => {
+            const hash = window.location.hash;
+            if (hash) {
+                const targetLink = document.querySelector(`.nav-link[href="${hash}"]`);
+                if (targetLink) {
+                    this.setActiveLink(targetLink, false);
+                }
             }
         });
     }
@@ -2027,8 +2140,8 @@ class FloatingPills {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new ParticleSystem();
     new FloatingPills();
+    // new ParticleSystem(); // Uncomment if you have this class
 });
 
 // Your existing theme toggle function (keep as is)
